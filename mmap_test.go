@@ -10,8 +10,10 @@ package mmap
 import (
 	"bytes"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -33,15 +35,28 @@ func openFile(flags int) *os.File {
 }
 
 func TestUnmap(t *testing.T) {
-	f := openFile(os.O_RDONLY)
+	f := openFile(os.O_RDWR)
 	defer f.Close()
-	mmap, err := Map(f, RDONLY, 0)
-	if err != nil {
-		t.Errorf("error mapping: %s", err)
+	waits := sync.WaitGroup{}
+	for i := 0; i < 15; i++ {
+		go func() {
+			waits.Add(1)
+			m, err := Map(f, RDWR, os.O_RDWR)
+			if err != nil {
+				waits.Done()
+				t.Errorf("error mapping: %s", err)
+				return
+			}
+			waits.Done()
+			m[i] = byte(i)
+			_ = m.Flush()
+			log.Println(string(m[i]))
+			//if err := m.Unmap(); err != nil {
+			//	t.Errorf("error unmapping: %s", err)
+			//}
+		}()
 	}
-	if err := mmap.Unmap(); err != nil {
-		t.Errorf("error unmapping: %s", err)
-	}
+	waits.Wait()
 }
 
 func TestReadWrite(t *testing.T) {

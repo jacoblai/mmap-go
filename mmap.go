@@ -77,6 +77,34 @@ func MapRegion(f *os.File, length int, prot, flags int, offset int64) (MMap, err
 	return mmap(length, uintptr(prot), uintptr(flags), fd, offset)
 }
 
+func MapRegionAlign(f *os.File, length int, prot, flags int, offset int64) (int64, MMap, error) {
+	off := offset % int64(os.Getpagesize())
+	length += int(off)
+	offset -= off
+
+	var fd uintptr
+	if flags&ANON == 0 {
+		fd = uintptr(f.Fd())
+		if length < 0 {
+			fi, err := f.Stat()
+			if err != nil {
+				return 0, nil, err
+			}
+			length = int(fi.Size())
+		}
+	} else {
+		if length <= 0 {
+			return 0, nil, errors.New("anonymous mapping requires non-zero length")
+		}
+		fd = ^uintptr(0)
+	}
+	m, err := mmap(length, uintptr(prot), uintptr(flags), fd, offset)
+	if err != nil {
+		return 0, nil, err
+	}
+	return off, m, nil
+}
+
 func (m *MMap) header() *reflect.SliceHeader {
 	return (*reflect.SliceHeader)(unsafe.Pointer(m))
 }
