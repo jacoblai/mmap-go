@@ -79,7 +79,7 @@ func MapRegion(f *os.File, length int, prot, flags int, offset int64) (MMap, err
 
 func MapRegionAlign(f *os.File, length int, prot, flags int, offset int64) (int64, MMap, error) {
 	off := int64(0)
-	if offset+int64(length) <= int64(os.Getpagesize()) {
+	if offset <= int64(os.Getpagesize()) {
 		off = offset
 		offset = 0
 	} else {
